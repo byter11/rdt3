@@ -24,14 +24,25 @@ class Receiver(StateMachine):
 
     def rdt_recv(self):
         try:
-            return Packet().load(self.socket.recv(1024))
+            data = self.socket.recvobj()
+            return Packet(**data)
         except TimeoutError:
             return Packet()
 
     def wait_from_below(self, seq):
         rcvpkt = self.rdt_recv()
+        print("RECV")
+        print("ACK ", rcvpkt.ack)
+        print("SEQ ", rcvpkt.seq)
+        print("DATA ", len(rcvpkt.data))
+        print()
+
+        if not rcvpkt:
+            print("Timeout rcvpkt")
+            return ("wait_from_below", seq)
 
         if rcvpkt.seq != seq:
+            print("Invalid sequence in rcvpkt")
             sndpkt = Packet(ack=rcvpkt.seq)
             self.socket.sendobj(sndpkt.encode())
             return ("wait_from_below", seq)
@@ -39,5 +50,7 @@ class Receiver(StateMachine):
         self.data += rcvpkt.data
         sndpkt = Packet(ack=seq)
         self.socket.sendobj(sndpkt.encode())
+
+        print("Sent ACK ", seq)
 
         return ("wait_from_below", int(not seq))

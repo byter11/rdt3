@@ -26,7 +26,6 @@ class Packet:
         # return self._dump()
 
     def _dump(self, indent=0):
-        print(self.data)
         return bson.dumps({
           'ack': self.ack,
           'seq': self.seq,
@@ -35,7 +34,8 @@ class Packet:
           })
 
     def __str__(self):
-        print('ack:', str(self.ack))
-        print('seq:', str(self.seq))
-        print('checksum:', str(self.checksum))
-        print('data:', str(self.data))
+        return f"""
+        ack: {self.ack}
+        seq: {self.seq}
+        checksum: {self.checksum}
+        data: {self.data}"""

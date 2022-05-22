@@ -25,7 +25,7 @@ class Sender(StateMachine):
         if not pkt:
             print("Client disconnected")
             return ("end", None)
-        print(pkt)
+        # print(pkt)
         # self.stream = open(f"{os.path.dirname(__file__)}/files/{pkt.data.decode('utf-8')}", 'rb')
         self.stream = io.BytesIO(
             Path(f"{os.path.dirname(__file__)}/files/{pkt.data.decode('utf-8')}").read_bytes()
@@ -40,22 +40,31 @@ class Sender(StateMachine):
 
     def rdt_recv(self):
         try:
-            data = self.conn.recv(1024)
-            return Packet().load(data=data)
-        except Exception as e:
-            print(e)
+            data = self.conn.recvobj()
+            return Packet(**data)
+        except TimeoutError as e:
+            print("timeout ", e)
+
+        return Packet()
 
     def wait_from_above(self, seq):
+        print("wait_from_above", seq)
         data = self.stream.read(1024)
+        if not data:
+            return ("end", None)
         pkt = self.rdt_send(data, seq)
         return ("wait_for_ack", pkt)
 
     def wait_for_ack(self, pkt: Packet):
+        print("wait_for_ack", pkt.seq)
         rcvpkt = self.rdt_recv()
 
-        if rcvpkt.ack is None or rcvpkt.ack != pkt.ack:
+        if rcvpkt.ack is None or rcvpkt.ack != pkt.seq:
+            print("Invalid ACK")
             if rcvpkt.ack is None:
-                self.rdt_send()
+                print("NO ACK Received. Re sending")
+                self.rdt_send(pkt.data, pkt.seq)
             return ('wait_for_ack', rcvpkt.seq)
 
-        return ("wait_from_above", int(not rcvpkt.seq))
+        print('ACK: ', rcvpkt)
+        return ("wait_from_above", int(not int(rcvpkt.ack)))

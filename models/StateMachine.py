@@ -19,7 +19,7 @@ class StateMachine(threading.Thread):
 
         while True:
             newState, cargo = handler(cargo)
-            print(newState, cargo)
+
             handler = self.handlers[newState]
             if newState.lower() == self.exitState:
                 return
