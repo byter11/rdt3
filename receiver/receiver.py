@@ -1,29 +1,43 @@
-import os, time, socket, threading
-from util.StateMachine import StateMachine
+import os
+import time
+from models.StateMachine import StateMachine
+from models.Packet import Packet
+
+SENDER_PORT = os.environ['SENDER_PORT']
+
 
 class Receiver(StateMachine):
-    def __init__(self, socket, conn):
+    def __init__(self, sock):
         super().__init__()
-        self.socket = socket
-        self.conn = conn
-        self.conn.settimeout(2)
+        self.socket = sock
+        self.data = b''
+        self.add("wait_from_below", self.wait_from_below)
+        self.add("end", self.socket.close)
 
-        self.add("wait_from_above", self.wait_from_above)
-        self.add("wait_for_ack", self.wait_for_ack)
-    
-    def run(self, cargo):
-        print('yo')
-        request = self.conn.recv(1024)
-        if not request:
-            print("Client disconnected")
-            return ("end", None)
-        super().run(cargo)
-        
-    def wait_from_above(self, pkt):
+    def run(self, file):
+        time.sleep(0.2)
 
-        self.conn.send(b'a')
+        print('receiver running')
+        self.socket.sendobj(Packet(data=file.encode('utf-8')).encode())
 
-        return ("wait_for_ack", pkt)
-        
-    def wait_for_ack(self, pkt):
-        return ("wait_from_above", int(not pkt))
+        super().run(0)
+
+    def rdt_recv(self):
+        try:
+            return Packet().load(self.socket.recv(1024))
+        except TimeoutError:
+            return Packet()
+
+    def wait_from_below(self, seq):
+        rcvpkt = self.rdt_recv()
+
+        if rcvpkt.seq != seq:
+            sndpkt = Packet(ack=rcvpkt.seq)
+            self.socket.sendobj(sndpkt.encode())
+            return ("wait_from_below", seq)
+
+        self.data += rcvpkt.data
+        sndpkt = Packet(ack=seq)
+        self.socket.sendobj(sndpkt.encode())
+
+        return ("wait_from_below", int(not seq))
