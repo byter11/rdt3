@@ -2,8 +2,8 @@ import threading
 
 
 class StateMachine(threading.Thread):
-    def __init__(self, exitState='end'):
-        self.handlers = {'end': lambda: 0}
+    def __init__(self, exitState):
+        self.handlers = {}
         self.startState = None
         self.exitState = exitState
 
@@ -18,8 +18,12 @@ class StateMachine(threading.Thread):
         handler = self.handlers[self.startState]
 
         while True:
-            newState, cargo = handler(cargo)
+            if cargo is not None:
+                newState, cargo = handler(cargo)
+            else:
+                newState, cargo = handler()
 
             handler = self.handlers[newState]
-            if newState.lower() == self.exitState:
-                return
+            if newState == self.exitState:
+                handler()
+                break

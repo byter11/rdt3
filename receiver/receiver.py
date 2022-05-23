@@ -8,18 +8,18 @@ SENDER_PORT = os.environ['SENDER_PORT']
 
 class Receiver(StateMachine):
     def __init__(self, sock):
-        super().__init__()
+        super().__init__('end')
         self.socket = sock
         self.data = b''
         self.add("wait_from_below", self.wait_from_below)
-        self.add("end", self.socket.close)
+        self.add("end", lambda: 0)
+        self.socket.settimeout(5)
 
     def run(self, file):
         time.sleep(0.2)
 
         print('receiver running')
         self.socket.sendobj(Packet(data=file.encode('utf-8')).encode())
-
         super().run(0)
 
     def rdt_recv(self):
@@ -34,10 +34,14 @@ class Receiver(StateMachine):
         print("RECV")
         print("ACK ", rcvpkt.ack)
         print("SEQ ", rcvpkt.seq)
+        print("FIN ", rcvpkt.fin)
         print("DATA ", len(rcvpkt.data))
         print()
 
-        if not rcvpkt:
+        if rcvpkt.fin:
+            return ("end", None)
+
+        if not rcvpkt.data or rcvpkt.seq == -1:
             print("Timeout rcvpkt")
             return ("wait_from_below", seq)
 

@@ -1,4 +1,5 @@
-import os, io
+import os
+import io
 from pathlib import Path
 from models.StateMachine import StateMachine
 from models.Packet import Packet
@@ -9,7 +10,7 @@ REQUEST_TIMEOUT = 2
 
 class Sender(StateMachine):
     def __init__(self, sock, conn):
-        super().__init__()
+        super().__init__('end')
         self.socket = sock
         self.conn = conn
         self.conn.settimeout(20)
@@ -17,7 +18,7 @@ class Sender(StateMachine):
 
         self.add("wait_from_above", self.wait_from_above)
         self.add("wait_for_ack", self.wait_for_ack)
-        self.add("end", self.socket.close)
+        self.add("end", self.end)
 
     def run(self):
         print('running server')
@@ -25,10 +26,12 @@ class Sender(StateMachine):
         if not pkt:
             print("Client disconnected")
             return ("end", None)
-        # print(pkt)
-        # self.stream = open(f"{os.path.dirname(__file__)}/files/{pkt.data.decode('utf-8')}", 'rb')
+
+        print("Requested: ", pkt.data.decode('utf-8'))
         self.stream = io.BytesIO(
-            Path(f"{os.path.dirname(__file__)}/files/{pkt.data.decode('utf-8')}").read_bytes()
+            Path(
+                f"{os.path.dirname(__file__)}/files/{pkt.data.decode('utf-8')}"
+            ).read_bytes()
         )
 
         super().run(0)
@@ -47,11 +50,18 @@ class Sender(StateMachine):
 
         return Packet()
 
+    def end(self):
+        print('ending')
+        sndpkt = Packet(fin=1)
+        print('fin ', sndpkt)
+        self.conn.sendobj(sndpkt.encode())
+
     def wait_from_above(self, seq):
         print("wait_from_above", seq)
         data = self.stream.read(1024)
-        if not data:
-            return ("end", None)
+        print(len(data))
+        if len(data) <= 0:
+            return ("end", 0)
         pkt = self.rdt_send(data, seq)
         return ("wait_for_ack", pkt)
 

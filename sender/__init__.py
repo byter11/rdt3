@@ -15,8 +15,10 @@ def listen():
     while True:
         try:
             conn, addr = sock.accept()
-            s = Sender(socket, conn)
+            print("Client Connected")
+            s = Sender(sock, conn)
             s.run()
+            conn.close()
 
         except KeyboardInterrupt:
             break
