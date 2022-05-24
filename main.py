@@ -1,6 +1,10 @@
 # Load configuration variables
+import os
 from dotenv import load_dotenv
 load_dotenv()
+
+pktsize = input("Packet size: ")
+os.environ['PACKET_SIZE'] = str(int(pktsize)) or 1024
 
 import sender
 import bson

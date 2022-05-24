@@ -4,13 +4,15 @@ from models.StateMachine import StateMachine
 from models.Packet import Packet
 
 SENDER_PORT = os.environ['SENDER_PORT']
+PACKET_SIZE = int(os.environ['PACKET_SIZE'])
 
 
 class Receiver(StateMachine):
-    def __init__(self, sock):
+    def __init__(self, sock, file):
         super().__init__('end')
         self.socket = sock
         self.data = b''
+        self.file = file
         self.add("wait_from_below", self.wait_from_below)
         self.add("end", lambda: 0)
         self.socket.settimeout(5)
@@ -31,14 +33,17 @@ class Receiver(StateMachine):
 
     def wait_from_below(self, seq):
         rcvpkt = self.rdt_recv()
+        print()
         print("RECV")
-        print("ACK ", rcvpkt.ack)
-        print("SEQ ", rcvpkt.seq)
-        print("FIN ", rcvpkt.fin)
         print("DATA ", len(rcvpkt.data))
+        print("FIN ", rcvpkt.fin)
         print()
 
         if rcvpkt.fin:
+            with open(
+                f"{os.path.dirname(__file__)}/files/{self.file}", 'wb'
+            ) as f:
+                f.write(self.data)
             return ("end", None)
 
         if not rcvpkt.data or rcvpkt.seq == -1:
@@ -54,7 +59,5 @@ class Receiver(StateMachine):
         self.data += rcvpkt.data
         sndpkt = Packet(ack=seq)
         self.socket.sendobj(sndpkt.encode())
-
-        print("Sent ACK ", seq)
 
         return ("wait_from_below", int(not seq))

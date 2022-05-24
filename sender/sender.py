@@ -6,6 +6,7 @@ from models.Packet import Packet
 
 PORT = os.environ['SENDER_PORT']
 REQUEST_TIMEOUT = 2
+PACKET_SIZE = int(os.environ['PACKET_SIZE'])
 
 
 class Sender(StateMachine):
@@ -28,11 +29,14 @@ class Sender(StateMachine):
             return ("end", None)
 
         print("Requested: ", pkt.data.decode('utf-8'))
-        self.stream = io.BytesIO(
-            Path(
-                f"{os.path.dirname(__file__)}/files/{pkt.data.decode('utf-8')}"
-            ).read_bytes()
-        )
+        try:
+            self.stream = io.BytesIO(
+                Path(
+                    f"{os.path.dirname(__file__)}/files/{pkt.data.decode('utf-8')}"
+                ).read_bytes()
+            )
+        except FileNotFoundError:
+           return self.end() 
 
         super().run(0)
 
@@ -51,15 +55,11 @@ class Sender(StateMachine):
         return Packet()
 
     def end(self):
-        print('ending')
         sndpkt = Packet(fin=1)
-        print('fin ', sndpkt)
         self.conn.sendobj(sndpkt.encode())
 
     def wait_from_above(self, seq):
-        print("wait_from_above", seq)
-        data = self.stream.read(1024)
-        print(len(data))
+        data = self.stream.read(PACKET_SIZE)
         if len(data) <= 0:
             return ("end", 0)
         pkt = self.rdt_send(data, seq)
@@ -76,5 +76,5 @@ class Sender(StateMachine):
                 self.rdt_send(pkt.data, pkt.seq)
             return ('wait_for_ack', rcvpkt.seq)
 
-        print('ACK: ', rcvpkt)
+        print('ACK ', rcvpkt.ack)
         return ("wait_from_above", int(not int(rcvpkt.ack)))
